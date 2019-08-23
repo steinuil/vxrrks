@@ -1,7 +1,15 @@
 open Mirage
 
+let packages = [
+  package "duration";
+  package "lwt_ppx";
+]
+
 let main =
-  foreign "Unikernel.Main" job
+  foreign
+    "Unikernel.Main"
+    ~packages
+    (time @-> job)
 
 let () =
-  register "vxrrks" [main]
+  register "vxrrks" [main $ default_time]
