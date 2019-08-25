@@ -1,11 +1,10 @@
 module T = Mirage_types_lwt
+module type HTTP = Cohttp_lwt.S.Server
 
-module Main (Time : T.TIME) = struct
-  let start _time =
-    let rec loop () =
-      Logs.info (fun f -> f "soap");
-      Time.sleep_ns (Duration.of_sec 1);%lwt
-      loop ()
-    in
-    loop ()
+module Main (Http : HTTP) = struct
+  module Server = Vxrrks_server.Server.Make(Http)
+
+  let start http =
+    let tcp = `TCP 8080 in
+    http tcp @@ Server.make ()
 end

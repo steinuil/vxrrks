@@ -1,0 +1,4 @@
+(library
+ (name vxrrks_server)
+ (libraries lwt cohttp-lwt)
+ (preprocess (pps lwt_ppx)))

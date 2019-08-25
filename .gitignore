@@ -1,10 +1,12 @@
 _build
+.merlin
 .mirage.config
 config/
 key_gen.ml
 main.ml
 main.native
 Makefile
+mirage-unikernel-*.install
 mirage-unikernel-*.opam
 myocamlbuild.ml
 vxrrks

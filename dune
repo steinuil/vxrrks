@@ -1,0 +1,17 @@
+(executable
+ (public_name vxrrks)
+ (name main)
+ (modules unikernel main key_gen)
+ (libraries
+  vxrrks_server
+  cohttp-mirage
+  functoria-runtime
+  mirage-bootvar-unix
+  mirage-clock-unix
+  mirage-conduit
+  mirage-logs
+  mirage-runtime
+  mirage-types-lwt
+  mirage-unix
+  nocrypto.lwt
+  tcpip.stack-socket))
