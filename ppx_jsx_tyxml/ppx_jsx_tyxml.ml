@@ -1,5 +1,6 @@
 open Ppxlib
 module Result = Stdlib.Result
+module Lint_error = Ppxlib.Driver.Lint_error
 
 
 let ( let* ) = Result.bind
@@ -52,14 +53,17 @@ let transform_lowercase_args ~loc args =
   let rec loop attrs children = function
     | (Nolabel, { pexp_desc = Pexp_construct ({ txt = Lident "()"; _}, None); _ }) :: [] ->
         Result.Ok (attrs, children)
-    | (Nolabel, _) :: _ ->
-        Result.Error "found non-labelled argument before the last position"
+    | (Nolabel, { pexp_loc; _ }) :: _ ->
+        "found non-labelled argument before the last position"
+        |> Lint_error.of_string pexp_loc |> Result.error
     | [] ->
-        Result.Error "() not found in last position"
+        "() not found in last position"
+        |> Lint_error.of_string loc |> Result.error
     | (Labelled "children", c) :: rest when children = None ->
         loop attrs (Some c) rest
-    | (Labelled "children", _) :: _ ->
-        Result.Error "children declared more than once"
+    | (Labelled "children", { pexp_loc; _ }) :: _ ->
+        "children declared more than once"
+        |> Lint_error.of_string pexp_loc |> Result.error
     | (Labelled name, expr) :: rest ->
         let attr = transform_labelled name expr in
         loop (attr :: attrs) children rest
@@ -100,7 +104,7 @@ let transform_expr expr =
       Result.Ok expr
 
   | _ ->
-      Result.Error "invalid expr"
+      Result.Error (Lint_error.of_string expr.pexp_loc "invalid expr")
 
 
 let contains_jsx : attributes -> bool =
@@ -124,12 +128,24 @@ let mapper = object
 end
 
 
+let lint_folder = object
+  inherit [Lint_error.t list] Ast_traverse.fold as super
+
+  method! expression expr errors =
+    let errors = super#expression expr errors in
+    if contains_jsx expr.pexp_attributes then begin
+      match transform_expr expr with
+      | Result.Ok _ -> errors
+      | Result.Error err -> err :: errors
+    end else
+      errors
+end
+
+
 let () =
   Driver.register_transformation
     "ppx_jsx_tyxml"
     ~impl:mapper#structure
     ~intf:mapper#signature
-    (*
-    ~lint_impl:
-    ~lint_intf:
-    *)
+    ~lint_impl:(fun impl -> lint_folder#structure impl [])
+    ~lint_intf:(fun intf -> lint_folder#signature intf [])
