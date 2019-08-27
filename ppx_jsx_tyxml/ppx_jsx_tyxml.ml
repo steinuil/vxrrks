@@ -2,8 +2,22 @@ open Ppxlib
 module Result = Stdlib.Result
 
 
-(*
 let ( let* ) = Result.bind
+
+
+let lident ~loc id = { txt = Lident id; loc }
+
+
+let list ~loc ls =
+  let empty = Ast_helper.Exp.construct ~loc (lident ~loc "[]") None in
+  List.fold_left (fun acc expr ->
+    Ast_helper.(Exp.construct
+      ~loc:expr.pexp_loc
+      (lident ~loc:expr.pexp_loc "::")
+      (Some (Exp.tuple ~loc:expr.pexp_loc [expr; acc]))
+    )
+  ) empty ls
+
 
 
 let ocaml_reserved =
@@ -23,56 +37,50 @@ let transform_attr_name name =
     "a_" ^ name_trim
   else
     "a_" ^ name
-    *)
 
 
-    (*
-let extract_children ~loc attrs =
-  let rec loop (children, other) = function
-    | (Nolabel, [%expr ()]) :: [] ->
-        (children, other)
+let transform_labelled name expr =
+  let open Ast_helper in
+  let loc = expr.pexp_loc in
+  let name = transform_attr_name name in
+  let ident = Exp.ident ~loc (lident ~loc name) in
+  Exp.apply ~loc ident [Nolabel, expr]
+
+
+(* ~href:link ~ayy ~children () -> ~a:[a_href link; a_ayy ayy] children *)
+let transform_lowercase_args ~loc args =
+  let rec loop attrs children = function
+    | (Nolabel, { pexp_desc = Pexp_construct ({ txt = Lident "()"; _}, None); _ }) :: [] ->
+        Result.Ok (attrs, children)
     | (Nolabel, _) :: _ ->
-        invalid_arg "JSX: found non-labelled argument before the last position"
+        Result.Error "found non-labelled argument before the last position"
     | [] ->
-        invalid_arg "JSX: () not found in last position"
-    | (Labelled "children", children) :: rest ->
-        loop (Some children, other) rest
-    | arg :: rest ->
-        loop (children, arg :: other) rest
+        Result.Error "() not found in last position"
+    | (Labelled "children", c) :: rest when children = None ->
+        loop attrs (Some c) rest
+    | (Labelled "children", _) :: _ ->
+        Result.Error "children declared more than once"
+    | (Labelled name, expr) :: rest ->
+        let attr = transform_labelled name expr in
+        loop (attr :: attrs) children rest
+    | (Optional _name, _expr) :: _rest ->
+        failwith "ayy"
   in
-  let children, rest = loop (None, []) attrs in
-  match children with
-  | Some children -> children, rest
-  | None -> [%expr []], rest
-
-
-let transform_attrs ~loc attrs =
-  let _children, attrs = extract_children ~loc attrs in
-  let attrs =
-    attrs |> List.iter (function
-      | Optional label, expr (* warning: tyxml doesn't really need these *)
-      | Labelled label, expr ->
-          let label = transform_attr_name label in
-
-      | Nolabel, _ ->
-          assert false
-    )
+  let* attrs, children = loop [] None args in
+  let attrs = list ~loc attrs in
+  let children = match children with
+  | Some children -> children
+  | None -> Ast_helper.(Exp.construct ~loc (lident ~loc "[]") None)
   in
-  attrs
-  *)
-
-
-    (*
-(* ~a ~b ~c ~children () ->  *)
-let transform_lowercase_args args =
-  *)
+  let args = [(Labelled "a", attrs); (Nolabel, children)] in
+  Result.Ok args
 
 
 let transform_expr expr =
   match expr.pexp_desc with
   (* <div /> -> div *)
   | Pexp_apply ({ pexp_desc = Pexp_ident { txt = Lident _; _ }; _ } as ident, args) ->
-      (* let* args = transform_lowercase_args args in *)
+      let* args = transform_lowercase_args ~loc:expr.pexp_loc args in
       Result.Ok { expr with pexp_desc = Pexp_apply (ident, args) }
 
   (* <View /> -> View.make *)
