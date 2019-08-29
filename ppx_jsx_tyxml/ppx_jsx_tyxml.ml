@@ -20,7 +20,6 @@ let list ~loc ls =
   ) empty ls
 
 
-
 let ocaml_reserved =
   [ "and"; "as"; "asr"; "assert"; "begin"; "class"; "constraint"; "do"; "done"
   ; "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun"
@@ -146,6 +145,4 @@ let () =
   Driver.register_transformation
     "ppx_jsx_tyxml"
     ~impl:mapper#structure
-    ~intf:mapper#signature
     ~lint_impl:(fun impl -> lint_folder#structure impl [])
-    ~lint_intf:(fun intf -> lint_folder#signature intf [])
